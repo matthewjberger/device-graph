@@ -1,4 +1,8 @@
-use petgraph::{graph::WalkNeighbors, prelude::*};
+use petgraph::{
+    graph::{NodeIndex, WalkNeighbors},
+    visit::Dfs,
+    Direction::{self, Incoming, Outgoing},
+};
 use std::{
     cmp::PartialEq,
     fmt::Debug,
@@ -7,22 +11,22 @@ use std::{
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum SceneGraphError {
+pub enum DeviceGraphError {
     #[error("Failed to walk scene graph!")]
     WalkSceneGraph(#[source] Box<dyn std::error::Error>),
 }
 
-type Result<T, E = SceneGraphError> = std::result::Result<T, E>;
+type Result<T, E = DeviceGraphError> = std::result::Result<T, E>;
 
-pub type Entity = u8;
+pub type Device = u8;
 
-pub type EntitySceneGraph = SceneGraph<Entity>;
-pub type EntitySceneGraphNode = SceneGraphNode<Entity>;
+pub type DeviceGraph = Graph<Device>;
+pub type DeviceGraphNode = GraphNode<Device>;
 
 #[derive(Debug, Clone)]
-pub struct SceneGraph<T: Copy + PartialEq + Debug>(pub Graph<T, ()>);
+pub struct Graph<T: Copy + PartialEq + Debug>(pub petgraph::Graph<T, ()>);
 
-impl<T> Default for SceneGraph<T>
+impl<T> Default for Graph<T>
 where
     T: Copy + PartialEq + Debug,
 {
@@ -31,12 +35,12 @@ where
     }
 }
 
-impl<T> SceneGraph<T>
+impl<T> Graph<T>
 where
     T: Copy + PartialEq + Debug,
 {
     pub fn new() -> Self {
-        Self(Graph::<T, ()>::new())
+        Self(petgraph::Graph::<T, ()>::new())
     }
 
     pub fn number_of_nodes(&self) -> usize {
@@ -75,20 +79,20 @@ where
             .collect::<Vec<_>>())
     }
 
-    pub fn root_nodes(&self) -> Result<Vec<SceneGraphNode<T>>> {
+    pub fn root_nodes(&self) -> Result<Vec<GraphNode<T>>> {
         Ok(self
             .root_node_indices()?
             .iter()
             .enumerate()
-            .map(|(offset, node_index)| SceneGraphNode::new(self[*node_index], offset as _))
+            .map(|(offset, node_index)| GraphNode::new(self[*node_index], offset as _))
             .collect::<Vec<_>>())
     }
 
-    pub fn collect_nodes(&self) -> Result<Vec<SceneGraphNode<T>>> {
+    pub fn collect_nodes(&self) -> Result<Vec<GraphNode<T>>> {
         let mut nodes = Vec::new();
         let mut linear_offset = 0;
         self.walk(|node_index| {
-            nodes.push(SceneGraphNode::new(self[node_index], linear_offset));
+            nodes.push(GraphNode::new(self[node_index], linear_offset));
             linear_offset += 1;
             Ok(())
         })?;
@@ -110,7 +114,7 @@ where
             }
             let mut dfs = Dfs::new(&self.0, node_index);
             while let Some(node_index) = dfs.next(&self.0) {
-                action(node_index).map_err(SceneGraphError::WalkSceneGraph)?;
+                action(node_index).map_err(DeviceGraphError::WalkSceneGraph)?;
             }
         }
         Ok(())
@@ -137,7 +141,7 @@ where
     }
 }
 
-impl<T> Index<NodeIndex> for SceneGraph<T>
+impl<T> Index<NodeIndex> for Graph<T>
 where
     T: Copy + PartialEq + Debug,
 {
@@ -148,7 +152,7 @@ where
     }
 }
 
-impl<T> IndexMut<NodeIndex> for SceneGraph<T>
+impl<T> IndexMut<NodeIndex> for Graph<T>
 where
     T: Copy + PartialEq + Debug,
 {
@@ -158,12 +162,12 @@ where
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct SceneGraphNode<T> {
+pub struct GraphNode<T> {
     pub value: T,
     pub offset: u32,
 }
 
-impl<T> SceneGraphNode<T> {
+impl<T> GraphNode<T> {
     pub fn new(value: T, offset: u32) -> Self {
         Self { value, offset }
     }
@@ -181,7 +185,7 @@ mod tests {
         assert_eq!(root_nodes.len(), 1);
         assert_eq!(
             root_nodes.iter().next(),
-            Some(&SceneGraphNode::<i32> {
+            Some(&GraphNode::<i32> {
                 value: FIRST_VALUE,
                 offset: 0
             })
@@ -250,14 +254,14 @@ mod tests {
         assert_eq!(nodes.len(), 2);
         assert_eq!(
             nodes.iter().next(),
-            Some(&SceneGraphNode::<i32> {
+            Some(&GraphNode::<i32> {
                 value: FIRST_VALUE,
                 offset: 0
             })
         );
         assert_eq!(
             nodes.iter().skip(1).next(),
-            Some(&SceneGraphNode::<i32> {
+            Some(&GraphNode::<i32> {
                 value: SECOND_VALUE,
                 offset: 1
             })
@@ -318,11 +322,11 @@ mod tests {
     const FIRST_VALUE: i32 = 4;
     const SECOND_VALUE: i32 = 12;
 
-    fn create_scenegraph() -> (SceneGraph<i32>, NodeIndex, NodeIndex) {
+    fn create_scenegraph() -> (Graph<i32>, NodeIndex, NodeIndex) {
         // 0
         //  \
         //   1
-        let mut scenegraph = SceneGraph::new();
+        let mut scenegraph = Graph::new();
         let first_node_index = scenegraph.add_root_node(4);
         let second_node_index = scenegraph.add_root_node(12);
         scenegraph.add_edge(first_node_index, second_node_index);
