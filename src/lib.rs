@@ -3,17 +3,17 @@ use petgraph::{
     visit::Dfs,
     Direction::{self, Incoming, Outgoing},
 };
+use snafu::{ResultExt, Snafu};
 use std::{
     cmp::PartialEq,
     fmt::Debug,
     ops::{Index, IndexMut},
 };
-use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(Debug, Snafu)]
 pub enum DeviceGraphError {
-    #[error("Failed to walk scene graph!")]
-    WalkSceneGraph(#[source] Box<dyn std::error::Error>),
+    #[snafu(display("Failed to walk device graph!"))]
+    WalkDeviceGraph { source: Box<dyn std::error::Error> },
 }
 
 type Result<T, E = DeviceGraphError> = std::result::Result<T, E>;
@@ -114,7 +114,7 @@ where
             }
             let mut dfs = Dfs::new(&self.0, node_index);
             while let Some(node_index) = dfs.next(&self.0) {
-                action(node_index).map_err(DeviceGraphError::WalkSceneGraph)?;
+                action(node_index).context(WalkDeviceGraphSnafu)?;
             }
         }
         Ok(())
