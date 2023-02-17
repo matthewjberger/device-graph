@@ -1,0 +1,9 @@
+[package]
+name = "device-graph"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+log = "0.4.17"
+petgraph = "0.6.3"
+thiserror = "1.0.38"
